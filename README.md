@@ -32,21 +32,58 @@ curl http://localhost:8080/health
 
 ## Как отправить события в Kafka
 
->  **macOS**: синтаксис `<<<` не работает в zsh. Используй `echo ... | docker exec -i`
+> ⚠️ **Важно**: timestamp должен быть актуальным — сервис хранит только события за последние 5 минут. Примеры ниже подставляют текущее время автоматически.
+
+### macOS / Linux
 
 ```bash
-echo '{"query":"iphone 16","session_id":"s1","timestamp":"2026-05-26T10:00:00Z"}' | \
+echo "{\"query\":\"iphone 16\",\"session_id\":\"s1\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" | \
   docker exec -i $(docker ps -qf "name=kafka") \
   kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
 ```
 
-Отправь несколько разных запросов:
+> ⚠️ **macOS**: синтаксис `<<<` не работает в zsh — используй `echo ... | docker exec -i` как показано выше.
+
+**Отправить несколько событий сразу:**
 ```bash
 for q in "iphone 16" "iphone 16" "nike sneakers" "nike sneakers" "nike sneakers" "adidas" "macbook pro"; do
-  echo "{\"query\":\"$q\",\"session_id\":\"s$RANDOM\",\"timestamp\":\"2026-05-26T10:00:00Z\"}" | \
+  echo "{\"query\":\"$q\",\"session_id\":\"s$RANDOM\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" | \
   docker exec -i $(docker ps -qf "name=kafka") \
   kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
 done
+```
+
+### Windows (PowerShell)
+
+```powershell
+$ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$msg = "{`"query`":`"iphone 16`",`"session_id`":`"s1`",`"timestamp`":`"$ts`"}"
+echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
+  kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
+```
+
+**Отправить несколько событий:**
+```powershell
+$queries = @("iphone 16", "iphone 16", "nike sneakers", "nike sneakers", "nike sneakers", "adidas", "macbook pro")
+foreach ($q in $queries) {
+  $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+  $msg = "{`"query`":`"$q`",`"session_id`":`"s$($RANDOM % 1000)`",`"timestamp`":`"$ts`"}"
+  echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
+    kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
+}
+```
+
+### Узнать точное имя kafka-контейнера
+
+Если команды выше не работают — узнай имя контейнера явно и подставь его:
+
+```bash
+docker ps --format "table {{.Names}}"
+```
+
+Пример вывода: `kafkatest-kafka-1`. Тогда используй:
+```bash
+docker exec -i kafkatest-kafka-1 kafka-console-producer ...
 ```
 
 ---
@@ -107,17 +144,30 @@ curl http://localhost:8080/metrics   # Prometheus метрики
 
 ## Проверка защиты от накруток
 
-Бот шлёт один и тот же запрос 5 раз с одной сессией — должен засчитаться как 1:
+Бот шлёт один и тот же запрос 5 раз с одной сессией — должен засчитаться как 1.
 
+**macOS / Linux:**
 ```bash
 for i in 1 2 3 4 5; do
-  echo '{"query":"spam","session_id":"bot-1","timestamp":"2026-05-26T10:00:00Z"}' | \
+  echo "{\"query\":\"spam\",\"session_id\":\"bot-1\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" | \
   docker exec -i $(docker ps -qf "name=kafka") \
   kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
 done
 
 curl "http://localhost:8080/top?limit=10"
 # spam будет count=1, а не count=5
+```
+
+**Windows (PowerShell):**
+```powershell
+1..5 | ForEach-Object {
+  $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+  $msg = "{`"query`":`"spam`",`"session_id`":`"bot-1`",`"timestamp`":`"$ts`"}"
+  echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
+    kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
+}
+
+curl "http://localhost:8080/top?limit=10"
 ```
 
 ---
@@ -135,6 +185,8 @@ docker exec $(docker ps -qf "name=kafka") \
   kafka-console-consumer --bootstrap-server localhost:9092 \
   --topic search-events --from-beginning --max-messages 5
 ```
+
+**Топ пустой хотя сообщения есть** — скорее всего timestamp в событии устарел. Убедись что используешь актуальное время, а не хардкод вроде `2025-01-01T00:00:00Z`.
 
 **Полный перезапуск с очисткой данных:**
 ```bash
