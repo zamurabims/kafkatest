@@ -32,7 +32,7 @@ curl http://localhost:8080/health
 
 ## Как отправить события в Kafka
 
-> ⚠️ **Важно**: timestamp должен быть актуальным — сервис хранит только события за последние 5 минут. Примеры ниже подставляют текущее время автоматически.
+> **Важно**: timestamp должен быть актуальным — сервис хранит только события за последние 5 минут. Примеры ниже подставляют текущее время автоматически.
 
 ### macOS / Linux
 
@@ -42,7 +42,7 @@ echo "{\"query\":\"iphone 16\",\"session_id\":\"s1\",\"timestamp\":\"$(date -u +
   kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
 ```
 
-> ⚠️ **macOS**: синтаксис `<<<` не работает в zsh — используй `echo ... | docker exec -i` как показано выше.
+> **macOS**: синтаксис `<<<` не работает в zsh — используй `echo ... | docker exec -i` как показано выше.
 
 **Отправить несколько событий сразу:**
 ```bash
@@ -51,26 +51,6 @@ for q in "iphone 16" "iphone 16" "nike sneakers" "nike sneakers" "nike sneakers"
   docker exec -i $(docker ps -qf "name=kafka") \
   kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
 done
-```
-
-### Windows (PowerShell)
-
-```powershell
-$ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$msg = "{`"query`":`"iphone 16`",`"session_id`":`"s1`",`"timestamp`":`"$ts`"}"
-echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
-  kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
-```
-
-**Отправить несколько событий:**
-```powershell
-$queries = @("iphone 16", "iphone 16", "nike sneakers", "nike sneakers", "nike sneakers", "adidas", "macbook pro")
-foreach ($q in $queries) {
-  $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-  $msg = "{`"query`":`"$q`",`"session_id`":`"s$($RANDOM % 1000)`",`"timestamp`":`"$ts`"}"
-  echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
-    kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
-}
 ```
 
 ### Узнать точное имя kafka-контейнера
@@ -156,18 +136,6 @@ done
 
 curl "http://localhost:8080/top?limit=10"
 # spam будет count=1, а не count=5
-```
-
-**Windows (PowerShell):**
-```powershell
-1..5 | ForEach-Object {
-  $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-  $msg = "{`"query`":`"spam`",`"session_id`":`"bot-1`",`"timestamp`":`"$ts`"}"
-  echo $msg | docker exec -i $(docker ps -qf "name=kafka") `
-    kafka-console-producer --bootstrap-server localhost:9092 --topic search-events
-}
-
-curl "http://localhost:8080/top?limit=10"
 ```
 
 ---
@@ -262,7 +230,7 @@ GET /top → atomic.Load(cachedTop) → filter(stoplist) → top-N → JSON
 | Как бороться с накрутками? | Дедупликация по session_id внутри бакета |
 | Точность vs скорость | Кеш обновляется раз в 500мс — для виджета на главной приемлемо |
 | Персистентность | Намеренно отсутствует — при рестарте через 5 минут данные актуальны |
-| Большое число уникальных сессий | Можно заменить set на HyperLogLog — но это усложнение без реальной проблемы (YAGNI) |
+| Большое число уникальных сессий | Можно заменить set на HyperLogLog |
 
 ---
 
