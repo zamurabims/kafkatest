@@ -11,7 +11,7 @@
 
 ```bash
 git clone https://github.com/zamurabims/kafkatest.git
-cd trending
+cd kafkatest
 go mod tidy
 ```
 
