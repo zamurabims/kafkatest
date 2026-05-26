@@ -154,8 +154,6 @@ docker exec $(docker ps -qf "name=kafka") \
   --topic search-events --from-beginning --max-messages 5
 ```
 
-**Топ пустой хотя сообщения есть** — скорее всего timestamp в событии устарел. Убедись что используешь актуальное время, а не хардкод вроде `2025-01-01T00:00:00Z`.
-
 **Полный перезапуск с очисткой данных:**
 ```bash
 docker-compose down -v
