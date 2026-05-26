@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_MESSAGE_MAX_BYTES: 1048576
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      CLUSTER_ID: "4lF6hFd8QuiN_2qe7eVxnQ"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  trending:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: search-events
+      KAFKA_GROUP_ID: trending-service
+      BUCKET_COUNT: "30"
+      BUCKET_DURATION_SEC: "10"
+      CACHE_REFRESH_MS: "500"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: on-failure
